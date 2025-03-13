@@ -2,7 +2,6 @@ import telebot
 import requests
 import os
 from dotenv import load_dotenv
-from flask import Flask, request
 
 # Загружаем переменные из .env
 load_dotenv(dotenv_path="dsb.env")
@@ -76,7 +75,8 @@ def chat_with_ai(message):
     else:
         bot.send_message(user_id, f'⚠ Чтобы пользоваться ботом, подпишитесь на канал: <a href="{TELEGRAM_CHANNEL_LINK}">NEWS_GLG</a>', parse_mode="HTML")
 
-
+# 🚀 **Запуск бота**
+if __name__ == "__main__":
     try:
         print("Бот запущен!")
         bot.polling(none_stop=True, timeout=60, long_polling_timeout=60)
