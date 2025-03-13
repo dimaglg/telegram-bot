@@ -12,6 +12,10 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")  # Пример: @my_channel или -1001234567890
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
+# Проверяем, все ли переменные загружены
+if not all([TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID, DEEPSEEK_API_KEY]):
+    raise ValueError("❌ Ошибка: Проверьте, что все переменные окружения заданы!")
+
 # Подключаем бота
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
@@ -24,7 +28,7 @@ def check_subscription(user_id):
         chat_member = bot.get_chat_member(TELEGRAM_CHANNEL_ID, user_id)
         return chat_member.status in ["member", "administrator", "creator"]
     except Exception as e:
-        print(f"Ошибка проверки подписки: {e}")
+        print(f"⚠ Ошибка проверки подписки: {e}")
         return False
 
 def ask_deepseek(user_id, prompt):
@@ -47,7 +51,7 @@ def ask_deepseek(user_id, prompt):
     }
 
     try:
-        response = requests.post(url, json=data, headers=headers, timeout=60, stream=True)
+        response = requests.post(url, json=data, headers=headers, timeout=60)
         response.raise_for_status()
         ai_response = response.json()["choices"][0]["message"]["content"]
 
@@ -108,7 +112,7 @@ if __name__ == "__main__":
         bot.set_webhook(url=WEBHOOK_URL)
         print(f"✅ Новый вебхук установлен: {WEBHOOK_URL}")
 
-        # Запускаем Flask-сервер
-        app.run(host="0.0.0.0", port=port, threaded=False)
+        # Запускаем Flask-сервер с логами
+        app.run(host="0.0.0.0", port=port, debug=True)
     except Exception as e:
         print(f"❌ Ошибка при запуске бота: {e}")
