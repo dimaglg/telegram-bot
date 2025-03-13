@@ -32,13 +32,11 @@ def ask_deepseek(user_id, prompt):
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
 
-    # Добавляем сообщение в историю пользователя
     if user_id not in user_history:
         user_history[user_id] = []
 
     user_history[user_id].append({"role": "user", "content": prompt})
 
-    # Оставляем только последние 10 сообщений для экономии токенов
     if len(user_history[user_id]) > 10:
         user_history[user_id] = user_history[user_id][-10:]
 
@@ -53,7 +51,6 @@ def ask_deepseek(user_id, prompt):
         response.raise_for_status()
         ai_response = response.json()["choices"][0]["message"]["content"]
 
-        # Добавляем ответ ИИ в историю
         user_history[user_id].append({"role": "assistant", "content": ai_response})
 
         return ai_response
@@ -71,7 +68,6 @@ def webhook():
     json_str = request.get_data().decode('UTF-8')
     update = telebot.types.Update.de_json(json_str)
 
-    # Обрабатываем входящие сообщения
     bot.process_new_updates([update])
 
     return "OK", 200
@@ -81,32 +77,33 @@ def webhook():
 def chat_with_ai(message):
     """Обрабатывает сообщения пользователей с учетом контекста"""
     user_id = message.chat.id
-    print(f"Получено сообщение от {user_id}: {message.text}")
+    print(f"📩 Получено сообщение от {user_id}: {message.text}")
 
     if check_subscription(user_id):
-        bot.send_chat_action(user_id, "typing")  # Показывает статус "пишет..."
+        bot.send_chat_action(user_id, "typing")
         response = ask_deepseek(user_id, message.text)
-        print(f"Ответ от ИИ: {response}")  # Отладка
+        print(f"🤖 Ответ от ИИ: {response}")
         bot.send_message(user_id, response)
     else:
         bot.send_message(user_id, f'⚠ Чтобы пользоваться ботом, подпишитесь на канал: {TELEGRAM_CHANNEL_ID}', parse_mode="HTML")
 
 # 🚀 **Запуск бота**
 if __name__ == "__main__":
-    # Получаем порт из переменной окружения
-    port = int(os.environ.get("PORT", 5000))  
+    port = int(os.environ.get("PORT", 10000))  # Проверяем правильный порт
+    WEBHOOK_URL = "https://telegram-bot-huzb.onrender.com/webhook"  # Замените на ваш URL
 
     try:
-        print(f"Бот запущен на порту {port}!")
+        print(f"🟢 Бот запускается на порту {port}...")
 
-        # Удаляем старый вебхук (если был)
-        bot.remove_webhook()
+        # Удаляем старый вебхук
+        bot.delete_webhook()
+        print("🔄 Старый вебхук удалён.")
 
         # Устанавливаем новый вебхук
-        WEBHOOK_URL = f"https://telegram-bot.onrender.com/webhook"  # Замените на свой URL
         bot.set_webhook(url=WEBHOOK_URL)
+        print(f"✅ Новый вебхук установлен: {WEBHOOK_URL}")
 
         # Запускаем Flask-сервер
-        app.run(host="0.0.0.0", port=port)
+        app.run(host="0.0.0.0", port=port, threaded=False)
     except Exception as e:
-        print(f"Ошибка при запуске бота: {e}")
+        print(f"❌ Ошибка при запуске бота: {e}")
