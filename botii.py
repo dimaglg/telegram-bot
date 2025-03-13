@@ -12,7 +12,9 @@ load_dotenv()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHANNEL_LINK = os.getenv("TELEGRAM_CHANNEL_LINK")  # Например: https://t.me/my_channel
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # URL вебхука
+
+# Используем правильный URL для вебхука (исправленный)
+WEBHOOK_URL = "https://telegram-bot-0pq2.onrender.com"  # Твой URL на Render
 
 # Логирование
 logging.basicConfig(level=logging.INFO)
