@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from flask import Flask, request
 
 # Загружаем переменные из .env
-load_dotenv(dotenv_path="dsb.env")
+load_dotenv()
 
 # Настройки бота и API
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
