@@ -76,17 +76,6 @@ def chat_with_ai(message):
     else:
         bot.send_message(user_id, f'⚠ Чтобы пользоваться ботом, подпишитесь на канал: <a href="{TELEGRAM_CHANNEL_LINK}">NEWS_GLG</a>', parse_mode="HTML")
 
-# 🚀 **Запуск бота через Flask**
-app = Flask(__name__)
-
-@app.route('/')
-def index():
-    return "Бот работает!"
-
-# Убедитесь, что бот слушает правильный порт
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Используем порт из переменной окружения Render
-    app.run(host="0.0.0.0", port=port)
 
     try:
         print("Бот запущен!")
