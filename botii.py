@@ -62,6 +62,11 @@ def ask_deepseek(user_id, prompt):
 # Создаем Flask-приложение
 app = Flask(__name__)
 
+@app.route("/")
+def home():
+    """Обработчик корневого запроса, чтобы избежать 404 ошибки."""
+    return "Bot is running!", 200
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """Обрабатывает входящие запросы от Telegram."""
