@@ -2,6 +2,7 @@ import telebot
 import requests
 import os
 from dotenv import load_dotenv
+from flask import Flask
 
 # Загружаем переменные из .env
 load_dotenv(dotenv_path="dsb.env")
@@ -77,8 +78,11 @@ def chat_with_ai(message):
 
 # 🚀 **Запуск бота**
 if __name__ == "__main__":
+    # Получаем порт из переменной окружения, если она установлена
+    port = int(os.environ.get("PORT", 5000))  # Используем порт из переменной окружения или 5000 по умолчанию
+
     try:
-        print("Бот запущен!")
-        bot.polling(none_stop=True, timeout=60, long_polling_timeout=60)
+        print(f"Бот запущен на порту {port}!")
+        bot.polling(none_stop=True, timeout=60, long_polling_timeout=60)  # Здесь мы используем polling, потому что бот работает через HTTP
     except Exception as e:
         print(f"Ошибка при запуске бота: {e}")
