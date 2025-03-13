@@ -9,7 +9,7 @@ load_dotenv(dotenv_path="dsb.env")
 
 # Настройки бота и API
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHANNEL_LINK = os.getenv("TELEGRAM_CHANNEL_LINK")  # Пример: https://t.me/my_channel
+TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID")  # Пример: @my_channel или -1001234567890
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
 # Подключаем бота
@@ -21,7 +21,7 @@ user_history = {}
 def check_subscription(user_id):
     """Проверяет, подписан ли пользователь на канал."""
     try:
-        chat_member = bot.get_chat_member(TELEGRAM_CHANNEL_LINK.replace("https://t.me/", "@"), user_id)
+        chat_member = bot.get_chat_member(TELEGRAM_CHANNEL_ID, user_id)
         return chat_member.status in ["member", "administrator", "creator"]
     except Exception as e:
         print(f"Ошибка проверки подписки: {e}")
@@ -89,17 +89,24 @@ def chat_with_ai(message):
         print(f"Ответ от ИИ: {response}")  # Отладка
         bot.send_message(user_id, response)
     else:
-        bot.send_message(user_id, f'⚠ Чтобы пользоваться ботом, подпишитесь на канал: <a href="{TELEGRAM_CHANNEL_LINK}">NEWS_GLG</a>', parse_mode="HTML")
+        bot.send_message(user_id, f'⚠ Чтобы пользоваться ботом, подпишитесь на канал: {TELEGRAM_CHANNEL_ID}', parse_mode="HTML")
 
 # 🚀 **Запуск бота**
 if __name__ == "__main__":
-    # Получаем порт из переменной окружения, если она установлена
-    port = int(os.environ.get("PORT", 10000))  # Используем порт из переменной окружения или 10000 по умолчанию
+    # Получаем порт из переменной окружения
+    port = int(os.environ.get("PORT", 5000))  
 
     try:
         print(f"Бот запущен на порту {port}!")
+
+        # Удаляем старый вебхук (если был)
         bot.remove_webhook()
-        bot.set_webhook(url=f"https://telegram-bot.onrender.com/webhook")  # Здесь замените на свой URL
-        app.run(host="0.0.0.0", port=port)  # Слушаем на порту, который задан в переменной окружения
+
+        # Устанавливаем новый вебхук
+        WEBHOOK_URL = f"https://telegram-bot.onrender.com/webhook"  # Замените на свой URL
+        bot.set_webhook(url=WEBHOOK_URL)
+
+        # Запускаем Flask-сервер
+        app.run(host="0.0.0.0", port=port)
     except Exception as e:
         print(f"Ошибка при запуске бота: {e}")
