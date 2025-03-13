@@ -1,8 +1,8 @@
+import os
 import telebot
 import requests
-import os
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, request
 
 # Загружаем переменные из .env
 load_dotenv(dotenv_path="dsb.env")
@@ -62,6 +62,21 @@ def ask_deepseek(user_id, prompt):
     except requests.exceptions.RequestException as e:
         return f"⚠ Ошибка запроса к DeepSeek API: {str(e)}"
 
+# Создаем Flask-приложение
+app = Flask(__name__)
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    """Обрабатывает входящие запросы от Telegram."""
+    json_str = request.get_data().decode('UTF-8')
+    update = telebot.types.Update.de_json(json_str)
+
+    # Обрабатываем входящие сообщения
+    bot.process_new_updates([update])
+
+    return "OK", 200
+
+# Обработчик для текстовых сообщений
 @bot.message_handler(func=lambda message: True)
 def chat_with_ai(message):
     """Обрабатывает сообщения пользователей с учетом контекста"""
@@ -79,10 +94,12 @@ def chat_with_ai(message):
 # 🚀 **Запуск бота**
 if __name__ == "__main__":
     # Получаем порт из переменной окружения, если она установлена
-    port = int(os.environ.get("PORT", 5000))  # Используем порт из переменной окружения или 5000 по умолчанию
+    port = int(os.environ.get("PORT", 10000))  # Используем порт из переменной окружения или 10000 по умолчанию
 
     try:
         print(f"Бот запущен на порту {port}!")
-        bot.polling(none_stop=True, timeout=60, long_polling_timeout=60)  # Здесь мы используем polling, потому что бот работает через HTTP
+        bot.remove_webhook()
+        bot.set_webhook(url=f"https://telegram-bot.onrender.com/webhook")  # Здесь замените на свой URL
+        app.run(host="0.0.0.0", port=port)  # Слушаем на порту, который задан в переменной окружения
     except Exception as e:
         print(f"Ошибка при запуске бота: {e}")
