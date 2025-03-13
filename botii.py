@@ -1,25 +1,28 @@
 import telebot
 import requests
 import os
+import logging
 from flask import Flask, request
 from dotenv import load_dotenv
 
-# Загружаем переменные из .env
+# Загружаем переменные окружения
 load_dotenv()
 
-# Настройки бота и API
+# Настройки
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHANNEL_LINK = os.getenv("TELEGRAM_CHANNEL_LINK")  # Пример: https://t.me/my_channel
+TELEGRAM_CHANNEL_LINK = os.getenv("TELEGRAM_CHANNEL_LINK")  # Например: https://t.me/my_channel
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # URL для вебхука
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # URL вебхука
 
-# Подключаем бота
+# Логирование
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Инициализация бота и Flask
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
-
-# Создаем Flask-приложение
 app = Flask(__name__)
 
-# Храним историю сообщений пользователей
+# История сообщений
 user_history = {}
 
 def check_subscription(user_id):
@@ -28,21 +31,21 @@ def check_subscription(user_id):
         chat_member = bot.get_chat_member(TELEGRAM_CHANNEL_LINK.replace("https://t.me/", "@"), user_id)
         return chat_member.status in ["member", "administrator", "creator"]
     except Exception as e:
-        print(f"Ошибка проверки подписки: {e}")
+        logger.error(f"Ошибка проверки подписки: {e}")
         return False
 
 def ask_deepseek(user_id, prompt):
-    """Запрашивает ответ у DeepSeek API с учетом истории чата."""
+    """Запрашивает ответ у DeepSeek API."""
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
 
-    # Добавляем сообщение в историю пользователя
+    # История диалога
     if user_id not in user_history:
         user_history[user_id] = []
-
+    
     user_history[user_id].append({"role": "user", "content": prompt})
 
-    # Оставляем только последние 10 сообщений для экономии токенов
+    # Оставляем последние 10 сообщений
     if len(user_history[user_id]) > 10:
         user_history[user_id] = user_history[user_id][-10:]
 
@@ -53,11 +56,11 @@ def ask_deepseek(user_id, prompt):
     }
 
     try:
-        response = requests.post(url, json=data, headers=headers, timeout=60)
+        response = requests.post(url, json=data, headers=headers, timeout=30)
         response.raise_for_status()
         ai_response = response.json()["choices"][0]["message"]["content"]
 
-        # Добавляем ответ ИИ в историю
+        # Добавляем ответ в историю
         user_history[user_id].append({"role": "assistant", "content": ai_response})
 
         return ai_response
@@ -80,28 +83,28 @@ def webhook():
 
 @bot.message_handler(func=lambda message: True)
 def chat_with_ai(message):
-    """Обрабатывает сообщения пользователей с учетом контекста"""
+    """Обрабатывает сообщения пользователей"""
     user_id = message.chat.id
-    print(f"Получено сообщение от {user_id}: {message.text}")
+    logger.info(f"Сообщение от {user_id}: {message.text}")
 
     if check_subscription(user_id):
-        bot.send_chat_action(user_id, "typing")  # Показывает статус "пишет..."
+        bot.send_chat_action(user_id, "typing")
         response = ask_deepseek(user_id, message.text)
-        print(f"Ответ от ИИ: {response}")  # Отладка
         bot.send_message(user_id, response)
     else:
         bot.send_message(user_id, f'⚠ Чтобы пользоваться ботом, подпишитесь на канал: <a href="{TELEGRAM_CHANNEL_LINK}">NEWS_GLG</a>', parse_mode="HTML")
 
-# 🚀 **Запуск бота**
+# 🚀 Запуск бота
 if __name__ == "__main__":
     try:
-        # Удаляем старый webhook
         bot.remove_webhook()
+        success = bot.set_webhook(url=f"{WEBHOOK_URL}/{TELEGRAM_BOT_TOKEN}")
 
-        # Ставим новый webhook
-        bot.set_webhook(url=f"{WEBHOOK_URL}/{TELEGRAM_BOT_TOKEN}")
+        if success:
+            logger.info(f"Webhook установлен: {WEBHOOK_URL}/{TELEGRAM_BOT_TOKEN}")
+        else:
+            logger.error("Ошибка установки вебхука!")
 
-        print(f"Бот запущен! Webhook установлен: {WEBHOOK_URL}/{TELEGRAM_BOT_TOKEN}")
-        app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+        app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
     except Exception as e:
-        print(f"Ошибка при запуске бота: {e}")
+        logger.error(f"Ошибка при запуске бота: {e}")
