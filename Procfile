@@ -1,1 +1,1 @@
-worker: python botii.py
+python botii.py
