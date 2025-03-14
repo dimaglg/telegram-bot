@@ -1,55 +1,50 @@
 import telebot
 import requests
 import os
-import logging
-from flask import Flask, request
+import time
 from dotenv import load_dotenv
 
-# Загружаем переменные окружения
+# Загружаем переменные из .env
 load_dotenv()
 
-# Настройки
+# Настройки бота и API
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHANNEL_LINK = os.getenv("TELEGRAM_CHANNEL_LINK")  # Например: https://t.me/my_channel
+TELEGRAM_CHANNEL_LINK = os.getenv("TELEGRAM_CHANNEL_LINK")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
-# Используем правильный URL для вебхука (исправленный)
-WEBHOOK_URL = "https://telegram-bot-0pq2.onrender.com"  # Твой URL на Render
+# Проверяем, загружены ли переменные
+if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHANNEL_LINK or not DEEPSEEK_API_KEY:
+    print("⚠ Ошибка: не загружены переменные окружения! Проверь файл .env")
+    exit(1)
 
-# Логирование
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Получаем имя канала
+TELEGRAM_CHANNEL_USERNAME = TELEGRAM_CHANNEL_LINK.split("/")[-1]
 
-# Инициализация бота и Flask
+# Подключаем бота
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
-app = Flask(__name__)
 
-# История сообщений
+# Храним историю сообщений пользователей
 user_history = {}
 
 def check_subscription(user_id):
     """Проверяет, подписан ли пользователь на канал."""
     try:
-        chat_member = bot.get_chat_member(TELEGRAM_CHANNEL_LINK.replace("https://t.me/", "@"), user_id)
+        chat_member = bot.get_chat_member(f"@{TELEGRAM_CHANNEL_USERNAME}", user_id)
         return chat_member.status in ["member", "administrator", "creator"]
     except Exception as e:
-        logger.error(f"Ошибка проверки подписки: {e}")
+        print(f"Ошибка проверки подписки: {e}")
         return False
 
 def ask_deepseek(user_id, prompt):
-    """Запрашивает ответ у DeepSeek API."""
+    """Запрашивает ответ у DeepSeek API с учетом истории чата."""
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
 
-    # История диалога
     if user_id not in user_history:
         user_history[user_id] = []
-    
-    user_history[user_id].append({"role": "user", "content": prompt})
 
-    # Оставляем последние 10 сообщений
-    if len(user_history[user_id]) > 10:
-        user_history[user_id] = user_history[user_id][-10:]
+    user_history[user_id].append({"role": "user", "content": prompt})
+    user_history[user_id] = user_history[user_id][-10:]
 
     data = {
         "model": "deepseek-chat",
@@ -58,55 +53,45 @@ def ask_deepseek(user_id, prompt):
     }
 
     try:
-        response = requests.post(url, json=data, headers=headers, timeout=30)
+        response = requests.post(url, json=data, headers=headers, timeout=60)
         response.raise_for_status()
-        ai_response = response.json()["choices"][0]["message"]["content"]
+        response_json = response.json()
 
-        # Добавляем ответ в историю
+        if "choices" in response_json and response_json["choices"]:
+            ai_response = response_json["choices"][0]["message"]["content"]
+        else:
+            ai_response = "⚠ DeepSeek не вернул ответ."
+
         user_history[user_id].append({"role": "assistant", "content": ai_response})
-
         return ai_response
+
     except requests.exceptions.Timeout:
         return "⚠ DeepSeek API долго отвечает, попробуйте позже."
-    except requests.exceptions.RequestException as e:
-        return f"⚠ Ошибка запроса к DeepSeek API: {str(e)}"
-
-@app.route("/", methods=["GET"])
-def home():
-    return "Бот работает! 🚀"
-
-@app.route(f"/{TELEGRAM_BOT_TOKEN}", methods=["POST"])
-def webhook():
-    """Получает обновления от Telegram и передает их боту."""
-    json_str = request.get_data().decode("utf-8")
-    update = telebot.types.Update.de_json(json_str)
-    bot.process_new_updates([update])
-    return "OK", 200
+    except requests.exceptions.HTTPError as e:
+        return f"⚠ Ошибка API: {response.status_code} {response.text}"
+    except Exception as e:
+        return f"⚠ Ошибка запроса: {str(e)}"
 
 @bot.message_handler(func=lambda message: True)
 def chat_with_ai(message):
-    """Обрабатывает сообщения пользователей"""
+    """Обрабатывает сообщения пользователей с учетом контекста"""
     user_id = message.chat.id
-    logger.info(f"Сообщение от {user_id}: {message.text}")
+    print(f"Получено сообщение от {user_id}: {message.text}")
 
     if check_subscription(user_id):
         bot.send_chat_action(user_id, "typing")
         response = ask_deepseek(user_id, message.text)
+        print(f"Ответ от ИИ: {response}")
         bot.send_message(user_id, response)
     else:
         bot.send_message(user_id, f'⚠ Чтобы пользоваться ботом, подпишитесь на канал: <a href="{TELEGRAM_CHANNEL_LINK}">NEWS_GLG</a>', parse_mode="HTML")
 
-# 🚀 Запуск бота
+# 🚀 Автоперезапуск бота
 if __name__ == "__main__":
-    try:
-        bot.remove_webhook()
-        success = bot.set_webhook(url=f"{WEBHOOK_URL}/{TELEGRAM_BOT_TOKEN}")
-
-        if success:
-            logger.info(f"Webhook установлен: {WEBHOOK_URL}/{TELEGRAM_BOT_TOKEN}")
-        else:
-            logger.error("Ошибка установки вебхука!")
-
-        app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
-    except Exception as e:
-        logger.error(f"Ошибка при запуске бота: {e}")
+    while True:
+        try:
+            print("Бот запущен!")
+            bot.polling(none_stop=True, timeout=60, long_polling_timeout=60)
+        except Exception as e:
+            print(f"Ошибка бота: {e}")
+            time.sleep(5)
